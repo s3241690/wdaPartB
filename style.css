@@ -1,0 +1,25 @@
+
+label.search
+{
+	text-align:right;
+	display: inline-block;
+	width: 200px;
+}
+
+input.search
+{
+	text-align:right;
+	display: inline-block;
+	width: 50px;
+	margin-left: 150px;
+}
+
+legend
+{
+border: 2px solid #000;
+}
+
+form
+{
+ width: 400px;
+}
