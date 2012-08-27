@@ -1,3 +1,11 @@
+<html>
+	<head>
+		<Title>WDA Assignment 1: Wine Database Results Page</Title>
+		<link rel="stylesheet" href="style.css" type="text/css" />
+	</head>
+	
+	<body>
+
 <?php
 
 require_once('connect.inc');
@@ -5,31 +13,41 @@ require_once('connect.inc');
 
 
 
-// Collect GET Search Criteria
-if(isset($_GET['wineName']))
-	$wineName = $_GET['wineName'];
-if(isset($_GET['wineryName']))
-{
-	$wineryName = $_GET['wineryName'];
-}
-if(isset($_GET['region']))
-{
+/* Collect GET Search Criteria */
+if($_GET['wine'] != null)
+	$wine = $_GET['wine'];
+
+if($_GET['winery'] != null)
+	$winery = $_GET['winery'];
+
+if($_GET['region'] != null)
 	$region = $_GET['region'];
-}
-if(isset($_GET['grapeVariety']))
+
+if($_GET['grapeVariety'] != null)
 	$grapeVariety = $_GET['grapeVariety'];
-if(isset($_GET['yearLowerBound']))
+	
+if($_GET['yearLowerBound'] != null)
 	$yearLowerBound = $_GET['yearLowerBound'];
-if(isset($_GET['yearUpperBound']))
+	
+if($_GET['yearUpperBound'] != null)
 	$yearUpperBound = $_GET['yearUpperBound'];
-if(isset($_GET['minWinesInStock']))
+	
+if($_GET['minWinesInStock'] != null)
 	$minWinesInStock = $_GET['minWinesInStock'];
-if(isset($_GET['minWinesOrdered']))
+	
+if($_GET['minWinesOrdered'] != null)
 	$minWinesOrdered = $_GET['minWinesOrdered'];
-if(isset($_GET['costLowerBound']))
+	
+if($_GET['costLowerBound'] != null)
 	$costLowerBound = $_GET['costLowerBound'];
-if(isset($_GET['costUpperBound']))
+	
+if($_GET['costUpperBound'] != null)
 	$costUpperBound = $_GET['costUpperBound'];
+	
+
+
+
+
 /*
  *	Error Checking
  *	Adds a binary bit value for each error to the $errors variable
@@ -37,82 +55,206 @@ if(isset($_GET['costUpperBound']))
  *	The Decimal variable is then returned and decoded to switch 
  *	on it's respective error messages on the search page. 
 */
+$errors = null;
 
-// Years is Invalid
+
+/* Years is Invalid */
 if($yearLowerBound > $yearUpperBound)
-	$errors = 1;
+	$errors += 1;
  
-// Cost is Invalid
+/* Cost is Invalid */
 if($costLowerBound > $costUpperBound)
 	$errors += 2;
+	
 
-// Create a return string
-$returnString ='search.php?wineName='.$wineName.'&wineryName='.wineryName.'&region='
+
+/* Create a return string for back button and incase of errors */
+$returnString ='search.php?wine='.$wine.'&winery='.$winery.'&region='
 						.$region.'&grapeVariety='.$grapeVariety.'&yearLowerBound='
 						.$yearLowerBound.'&yearUpperBound='.$yearUpperBound.'&minWinesInStock='
 						.$minWinesInStock.'&minWinesOrdered='.$minWinesOrdered.'&costLowerBound='
-						.$costLowerBound.'&costupperBound='.$costupperBound;
+						.$costLowerBound.'&costUpperBound='.$costUpperBound;
 
-// If there are errors add them to the return string and return to search page
-if (errors != null)
+/* If there are errors add them to the return string and return to search page */
+if ($errors != null)
 {
 	$returnString .= '&errors='.$errors;
-	echo $errors;
-	echo $yearLowerBound;
-	echo $yearUpperBound;
 
-	// header('Location: '.$returnString);
+	header('Location: '.$returnString);
 }
 
-/*  Create  Wine Detail SQL Query */
+/*  Create Base Wine SQL Query */
+	$query = "SELECT wine.wine_id, wine_name, "
+			."(SELECT GROUP_CONCAT( CAST( cost AS CHAR ) ) FROM inventory WHERE wine.wine_id = inventory.wine_id) as price, "
+			."GROUP_CONCAT( variety ) as variety, year, winery_name, region_name, "
+			."(SELECT SUM( on_hand ) FROM inventory WHERE wine.wine_id = inventory.wine_id) as available, "
+			."(SELECT SUM(qty) FROM items WHERE wine.wine_id = items.wine_id) as total_sold, "
+			."(SELECT SUM(price) FROM items WHERE wine.wine_id = items.wine_id) as total_revenue "
+			."FROM winery, region, wine, grape_variety, wine_variety, inventory "
+			."WHERE winery.region_id = region.region_id "
+			."AND wine.winery_id = winery.winery_id "
+			."AND wine_variety.variety_id = grape_variety.variety_id "
+			."AND wine.wine_id = wine_variety.wine_id "
+			."AND wine.wine_id = inventory.wine_id ";
 
-
-
-
-$wineDetailQuery = "SELECT wine_name, grape_variety, year, winery_name, region_name
-FROM winery, region, wine, grape_type
-WHERE winery.region_id = region.region_id
-AND wine.winery_id = winery.winery_id";
-AND
-if (isset($wine))
-{
-  $wineDetailQuery .= " AND wine_name like '{$wine}'";
-}
-if (isset($winery))
-{
-  $wineDetailQuery .= " AND winery_name like '{$winery}'";
-}
-
-if (isset($region) && $region != "All") {
-  $wineDetailQuery .= " AND region_name = '{$region}'";
+/* If wine name selected add as criteria */
+if(isset($wine)){
+  $query .= " AND wine.wine_name LIKE '{$wine}'";
 }
 
-
-// ... and then complete the query.
-$wineDetailQuery .= " ORDER BY wine_name";
-
-
-// Run the query on the server
-if(!($wineDetails = mysql_query($wineDetailQuery, $dbconn))) {
-	showerror();
+/* If winery name selected add as criteria */
+if(isset($winery)){
+  $query .= " AND winery.winery_name LIKE '{$winery}'";
 }
 
-// Find out how many rows are available
-$rowsFound = mysql_num_rows($wineDetails);
+/* If specific region selected add as criteria */
+if(isset($region) && $region != "All") {
+  $query .= " AND region.region_name = '{$region}'";
+}
 
-echo '\n'.$rowsFound;
 
-// If the query has results ...
-if ($rowsFound > 0) {
+/* If yearLowerBound selected add as criteria */
+if(isset($yearLowerBound)){
+	$query .=" AND wine.year >= {$yearLowerBound} ";
+}
 
-	while($line = mysql_fetch_assoc($wineDetails))
-	{
-		$wineDetails = $line;
+/* If yearUpperBound selected add as criteria */
+if(isset($yearUpperBound)){
+	$query .=" AND wine.year <= {$yearUpperBound} ";
+}
+
+/* If either costLowerBound or costUpperBound are set add base IN subquery criteria */
+/* then bolt on the conditions respectively and close the bracket*/
+
+if(isset($costLowerBound)){
+
+	$query .="AND wine.wine_id IN (SELECT wine.wine_id FROM wine, inventory WHERE wine.wine_id = inventory.wine_id ";
+
+	if (isset($costLowerBound)){
+		$query .="AND cost >= {$costLowerBound} ";
 	}
+	if (isset($costUpperBound)){
+		$query .="AND cost <= {$costUpperBound} ";
+	}	
 	
-} // end if $rowsFound body
+	$query .=")";
+
+}
+
+/* If grape_variety selected create IN subquery so that all the varieties of the wine can still be Concatinated in the main select clause*/	
+if(isset($grapeVariety)){
+ $query .="AND wine.wine_id IN (SELECT wine.wine_id FROM wine, wine_variety, grape_variety WHERE wine_variety.variety_id "
+		."= grape_variety.variety_id AND wine.wine_id = wine_variety.wine_id AND grape_variety.variety LIKE 'RED') ";
+}
+ 
+/* Group by Wine ID*/ 
+	$query .="GROUP BY wine.wine_id ";
+
+
+/* If Minimum wines in Stock selected add as criteria */
+if (isset($minWinesInStock)){
+	$query .=" HAVING total_on_hand >= {$minWinesInStock}";
+}
+
+/* If Minimum wines Ordered selected add as criteria */
+if (isset($minWinesOrdered)){
+	$query .=" AND total_ordered > {$minWinesOrdered}";
+}
 
 
 
-echo $wineDetails[$i][wine_name];
+
+
+/* Run the query on the server */
+
+$queryResult = mysql_query($query, $dbconn);
+
+
+					 $index = 0;
+					 while($row = mysql_fetch_assoc($queryResult)) {
+						$wineDetails[$index] = $row;;
+						$index++;
+					}
+					
+
+echo '<h1>WineStore Database: Search Results</h1>';
+
+
+/* Create Back Button*/
+echo '<a href="'.$returnString.'"><--Back</a> <a href="search.php">New Search</a>';
+echo '<br />';
+
+/* Check if there are any Results and display*/
+$tableSize = count($wineDetails);
+if ($tableSize > 0)
+{
+	echo $num_of_rows;
+	
+
+
+	echo '<table>';
+		
+	echo '<th>Wine Name</th>';
+	echo '<th>Winery Name</th>';
+	echo '<th>Grape Variety</th>';
+	echo '<th>Region</th>';
+	echo '<th>Price</th>';
+	echo '<th>Available</th>';
+	echo '<th>Total Sold</th>';
+	echo '<th>Total Revenue</th>';
+
+
+
+		
+			for($t=0;$t<$tableSize;$t++)
+			{
+				echo '<tr>';
+					
+					echo '<td>';
+						echo $wineDetails[$t]['wine_name'];
+					echo '</td>';
+							
+					echo '<td>';
+						echo $wineDetails[$t]['winery_name'];
+					echo '</td>';
+
+					echo '<td>';
+						echo $wineDetails[$t]['variety'];
+					echo '</td>';
+
+					echo '<td>';
+						echo $wineDetails[$t]['region_name'];
+					echo '</td>';
+
+					echo '<td>';
+						echo $wineDetails[$t]['price'];
+					echo '</td>';
+
+					echo '<td>';
+						echo $wineDetails[$t]['available'];
+					echo '</td>';
+
+					echo '<td>';
+						echo $wineDetails[$t]['total_sold'];
+					echo '</td>';
+
+					echo '<td>';
+						echo $wineDetails[$t]['total_revenue'];
+					echo '</td>';				
+				
+				echo '</tr>';
+			}
+		
+	echo '</table>';
+}
+else
+{
+	echo "<p>Your Query returned no results.</p>";
+}
+
 ?>
+
+
+</body>
+</html> 
+
